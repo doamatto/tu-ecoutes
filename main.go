@@ -51,6 +51,10 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 		return
 	}
 
+	// Establish needed globals
+	g := m.GuildID
+	c := m.ChannelID
+
 	if strings.HasPrefix(m.Content, "e.about") {
 		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 			Title:       "About this bot",
