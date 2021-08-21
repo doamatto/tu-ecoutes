@@ -79,13 +79,15 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 		client := youtube.Client{}
 		video, err := client.GetVideo(videoURL)
 		if err != nil {
-			log.Panicf("%v", err)
+			log.Panicf("YTDL: %v", err)
+			return
 		}
 		format := video.Formats.FindByItag(140) // 128kbps M4A
 		stream, err := client.GetStreamURL(video, format)
 		fmt.Println(stream)
 		if err != nil {
-			log.Panicf("%v", err)
+			log.Panicf("YTDL: %v", err)
+			return
 		}
 
 		// Convert to DCA
@@ -95,7 +97,8 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 		options.Application = "lowdelay"
 		encodeSession, err := dca.EncodeFile(stream, options)
 		if err != nil {
-			log.Panicf("%v", err)
+			log.Panicf("DCA: %v", err)
+			return
 		}
 		defer encodeSession.Cleanup()
 
