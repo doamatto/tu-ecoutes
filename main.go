@@ -104,7 +104,7 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 		vc.Speaking(true)
 		done := make(chan error)
 		dca.NewStream(encodeSession, vc, done)
-		err := <-done
+		er := <-done
 		if err != nil && err != io.EOF {
 			log.Panicf("%v", err)
 		}
