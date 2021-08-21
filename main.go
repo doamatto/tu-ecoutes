@@ -99,22 +99,12 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		defer encodeSession.Cleanup()
 
-		// Connect over WebRTC
-		vc, err := s.ChannelVoiceJoin(g, c, false, true)
-		if err != nil {
-			log.Panicf("%v", err)
-		}
-
-		// Load DCA
-		vc.Speaking(true)
+		// Start playback to Discord
 		done := make(chan error)
 		dca.NewStream(encodeSession, vc, done)
 		er := <-done
-		if err != nil && err != io.EOF {
-			log.Panicf("%v", err)
+		if er != nil && er != io.EOF {
+			log.Panicf("DCA: %v", er)
 		}
-		vc.Speaking(false)
-		time.Sleep(250 * time.Millisecond)
-		vc.Disconnect()
 	}
 }
