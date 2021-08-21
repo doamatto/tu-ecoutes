@@ -1,13 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jonas747/dca"
@@ -46,14 +46,26 @@ func main() {
 	log.Println("Shutting down bot gracefully...")
 }
 
+func fetchVC(s *discordgo.Session, m *discordgo.MessageCreate) string {
+	g := m.GuildID
+	guild, err := s.State.Guild(g)
+	if err != nil {
+		log.Panicf("DISCORD: %v", err)
+		return ""
+	}
+	for _, vs := range guild.VoiceStates {
+		if vs.UserID == m.Author.ID {
+			return vs.ChannelID
+		}
+	}
+	s.ChannelMessageSend(m.ChannelID, "You need to be in a voice channel for the bot to play a song.")
+	return ""
+}
+
 func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if m.Author.ID == s.State.User.ID {
 		return
 	}
-
-	// Establish needed globals
-	g := m.GuildID
-	c := m.ChannelID
 
 	if strings.HasPrefix(m.Content, "e.about") {
 		s.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
@@ -74,6 +86,32 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 	if strings.HasPrefix(m.Content, "e.play") {
 		// Check for arguments
+		url := strings.Split(m.Content, " ")
+		if len(url) < 2 {
+			s.ChannelMessageSend(m.ChannelID, "You need to mention the URL for a video or song (tip: copy and paste the link from your browser, instead of manually typing it in)")
+			return
+		}
+		videoURL := url[1]
+
+		// Establish needed globals
+		g := m.GuildID
+
+		// Fetch VC
+		vChannel := fetchVC(s, m)
+		if vChannel == "" {
+			return
+		}
+
+		// Connect over WebRTC
+		vc, err := s.ChannelVoiceJoin(g, vChannel, false, false)
+		if err != nil {
+			if _, ok := s.VoiceConnections[g]; ok {
+				vc = s.VoiceConnections[g]
+			} else {
+				log.Panicf("DISCORD: %v", err)
+				return
+			}
+		}
 
 		// Fetch stream through YTDL
 		client := youtube.Client{}
