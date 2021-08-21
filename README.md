@@ -2,7 +2,7 @@
 Music bot optimised for Discord. An experiment with [the dca format.](https://github.com/bwmarrin/dca)
 
 ## Building from source
-1. Install [Golang](https://golang.org/dl)
+1. Install [Golang](https://golang.org/dl) and FFmpeg 4.2.2
 2. Fetch dependencies and build (`go build`)
 
 The binary `tu-ecoutes` is then able to be executed with environment variables. **You will need to manually export and set these variables, as the .env file will not be read.** You can learn more about how to set environment variables on [Windows](https://docs.microsoft.com/powershell/module/microsoft.powershell.core/about/about_environment_variables), [macOS](https://support.apple.com/guide/terminal/apd382cc5fa-4f58-4449-b20a-41c53c006f8f), or [Linux](https://www.redhat.com/sysadmin/linux-environment-variables) with their respective links.
