@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -10,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/jonas747/dca"
 	"github.com/kkdai/youtube/v2"
 )
 
@@ -24,6 +24,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error authenticating with Discord's servers. More information to follow: %v", err)
 	}
+
+	// Set needed intents
+	s.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsGuildVoiceStates
 
 	// Open connection to Discord
 	err = s.Open()
@@ -58,7 +61,6 @@ func fetchVC(s *discordgo.Session, m *discordgo.MessageCreate) string {
 			return vs.ChannelID
 		}
 	}
-	s.ChannelMessageSend(m.ChannelID, "You need to be in a voice channel for the bot to play a song.")
 	return ""
 }
 
@@ -99,18 +101,15 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 		// Fetch VC
 		vChannel := fetchVC(s, m)
 		if vChannel == "" {
+			s.ChannelMessageSend(m.ChannelID, "You need to be in a voice channel for the bot to play a song.")
 			return
 		}
 
 		// Connect over WebRTC
 		vc, err := s.ChannelVoiceJoin(g, vChannel, false, false)
 		if err != nil {
-			if _, ok := s.VoiceConnections[g]; ok {
-				vc = s.VoiceConnections[g]
-			} else {
-				log.Panicf("DISCORD: %v", err)
-				return
-			}
+			log.Panicf("DISCORD: %v", err)
+			return
 		}
 
 		// Fetch stream through YTDL
@@ -121,31 +120,47 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 			return
 		}
 		format := video.Formats.FindByItag(140) // 128kbps M4A
-		stream, err := client.GetStreamURL(video, format)
+		stream, _, err := client.GetStream(video, format)
 		fmt.Println(stream)
 		if err != nil {
 			log.Panicf("YTDL: %v", err)
 			return
 		}
 
-		// Convert to DCA
-		options := dca.StdEncodeOptions
-		options.RawOutput = true
-		options.Bitrate = 64
-		options.Application = "lowdelay"
-		encodeSession, err := dca.EncodeFile(stream, options)
-		if err != nil {
-			log.Panicf("DCA: %v", err)
-			return
-		}
-		defer encodeSession.Cleanup()
+		// Load stream to buffer
+		var buffer = make([][]byte, 0)
+		var opuslen int16
 
-		// Start playback to Discord
-		done := make(chan error)
-		dca.NewStream(encodeSession, vc, done)
-		er := <-done
-		if er != nil && er != io.EOF {
-			log.Panicf("DCA: %v", er)
+		for {
+			err = binary.Read(stream, binary.LittleEndian, &opuslen)
+			if err == io.EOF || err == io.ErrUnexpectedEOF {
+				err := stream.Close()
+				if err != nil {
+					log.Panicf("BUFFER: %v", err)
+					return
+				}
+				return
+			}
+			if err != nil {
+				log.Panicf("BUFFER: %v", err)
+				return
+			}
+
+			InBuf := make([]byte, opuslen)
+			err = binary.Read(stream, binary.LittleEndian, &InBuf)
+			if err != nil {
+				log.Panicf("BUFFER: %v", err)
+			}
+			buffer = append(buffer, InBuf)
 		}
+
+		// Play stream in Discord
+		// TODO: convert it to a DCA stream before streaming to Discord
+		vc.Speaking(true)
+		for _, buff := range buffer {
+			vc.OpusSend <- buff
+		}
+		vc.Speaking(false)
+		vc.Disconnect()
 	}
 }
