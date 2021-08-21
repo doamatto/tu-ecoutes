@@ -82,7 +82,8 @@ func cmd(s *discordgo.Session, m *discordgo.MessageCreate) {
 			log.Panicf("%v", err)
 		}
 		format := video.Formats.FindByItag(140) // 128kbps M4A
-		stream, err := client.GetStreamURL(video, &video.Formats[0])
+		stream, err := client.GetStreamURL(video, format)
+		fmt.Println(stream)
 		if err != nil {
 			log.Panicf("%v", err)
 		}
